@@ -49,7 +49,6 @@ django-method-override
 django-model-utils
 django-mptt
 django-mysql==2.4.1
-django-oauth-toolkit                # Provides oAuth2 capabilities for Django
 django-pipeline
 django-pyfs
 django-ratelimit
