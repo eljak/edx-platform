@@ -411,11 +411,18 @@ class SequenceModule(SequenceFields, ProctoringFields, XModule):
         """
         Returns a dict of information about gated_content context
         """
-        gated_content = {}
-        gated_content['gated'] = not prereq_met
-        gated_content['prereq_url'] = prereq_meta_info['url'] if not prereq_met else None
-        gated_content['prereq_section_name'] = prereq_meta_info['display_name'] if not prereq_met else None
-        gated_content['gated_section_name'] = self.display_name
+        gated_content = {
+            'prereq_id': None,
+            'prereq_url': None,
+            'prereq_section_name': None,
+            'gated': False,
+            'gated_section_name': self.display_name,
+        }
+        if not prereq_met:
+            gated_content['gated'] = True
+            gated_content['prereq_url'] = prereq_meta_info['url']
+            gated_content['prereq_section_name'] = prereq_meta_info['display_name']
+            gated_content['prereq_id'] = prereq_meta_info['id']
 
         return gated_content
 
