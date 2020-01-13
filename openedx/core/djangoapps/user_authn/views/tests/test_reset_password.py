@@ -13,6 +13,7 @@ from django.conf import settings
 from django.contrib.auth.hashers import UNUSABLE_PASSWORD_PREFIX, make_password
 from django.contrib.auth.models import AnonymousUser, User
 from django.contrib.auth.tokens import default_token_generator
+from django.contrib.sessions.middleware import SessionMiddleware
 from django.core import mail
 from django.core.cache import cache
 from django.http import Http404
@@ -56,6 +57,7 @@ class ResetPasswordTests(EventTestMixin, CacheIsolationTestCase):
     """
     request_factory = RequestFactory()
 
+
     ENABLED_CACHES = ['default']
 
     def setUp(self):  # pylint: disable=arguments-differ
@@ -70,6 +72,11 @@ class ResetPasswordTests(EventTestMixin, CacheIsolationTestCase):
         self.user_bad_passwd.is_active = False
         self.user_bad_passwd.password = UNUSABLE_PASSWORD_PREFIX
         self.user_bad_passwd.save()
+
+    def process_request(self, request):
+        middleware = SessionMiddleware()
+        middleware.process_request(request)
+        request.session.save()
 
     @patch(
         'openedx.core.djangoapps.user_authn.views.password_reset.render_to_string',
@@ -348,6 +355,7 @@ class ResetPasswordTests(EventTestMixin, CacheIsolationTestCase):
         )
         request_params = {'new_password1': 'password1', 'new_password2': 'password2'}
         confirm_request = self.request_factory.post(url, data=request_params)
+        self.process_request(confirm_request)
         confirm_request.user = self.user
 
         # Make a password reset request with mismatching passwords.

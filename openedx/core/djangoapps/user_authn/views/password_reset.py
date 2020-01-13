@@ -10,7 +10,8 @@ from django.contrib import messages
 from django.contrib.auth.hashers import UNUSABLE_PASSWORD_PREFIX
 from django.contrib.auth.models import User
 from django.contrib.auth.tokens import default_token_generator
-from django.contrib.auth.views import PasswordResetConfirmView
+from django.contrib.auth.views import (
+    INTERNAL_RESET_SESSION_TOKEN, PasswordResetConfirmView)
 from django.core.exceptions import ObjectDoesNotExist
 from django.core.validators import ValidationError
 from django.http import Http404, HttpResponse, HttpResponseBadRequest, HttpResponseForbidden
@@ -49,7 +50,6 @@ from student.forms import send_account_recovery_email_for_user
 from util.json_request import JsonResponse
 from util.password_policy_validators import normalize_password, validate_password
 from util.request_rate_limiter import BadRequestRateLimiter, PasswordResetEmailRateLimiter
-
 
 SETTING_CHANGE_INITIATED = 'edx.user.settings.change_initiated'
 
@@ -159,7 +159,7 @@ class PasswordResetFormNoActive(PasswordResetForm):
         Validates that a user exists with the given email address.
         """
         email = self.cleaned_data["email"]
-        #The line below contains the only change, removing is_active=True
+        # The line below contains the only change, removing is_active=True
         self.users_cache = User.objects.filter(email__iexact=email)
 
         if not self.users_cache and is_secondary_email_feature_enabled():
@@ -299,6 +299,26 @@ def _uidb36_to_uidb64(uidb36):
     return uidb64
 
 
+class PasswordResetConfirmViewWrapper(PasswordResetConfirmView):
+
+    def _set_token_in_session(self, token):
+        if not token:
+            return
+        session = self.session
+        session[INTERNAL_RESET_SESSION_TOKEN] = token
+        session.save()
+
+    def get(self, request, *args, **kwargs):
+        token = kwargs.get('token')
+        self._set_token_in_session(token)
+        return super(PasswordResetConfirmView, self).get(request, *args, **kwargs)
+
+    def post(self, request, *args, **kwargs):
+        token = kwargs.get('token')
+        self._set_token_in_session(token)
+        return super(PasswordResetConfirmView, self).post(request, *args, **kwargs)
+
+
 # pylint: disable=too-many-statements
 def password_reset_confirm_wrapper(request, uidb36=None, token=None):
     """
@@ -306,6 +326,9 @@ def password_reset_confirm_wrapper(request, uidb36=None, token=None):
     Needed because we want to set the user as active at this step.
     We also optionally do some additional password policy checks.
     """
+
+    import pdb;
+    pdb.set_trace()
     # convert old-style base36-encoded user id to base64
     uidb64 = _uidb36_to_uidb64(uidb36)
     platform_name = {
@@ -325,7 +348,7 @@ def password_reset_confirm_wrapper(request, uidb36=None, token=None):
     except (ValueError, User.DoesNotExist):
         # if there's any error getting a user, just let django's
         # password_reset_confirm function handle it.
-        return PasswordResetConfirmView.as_view()(request, uidb64=uidb64, token=token, extra_context=platform_name)
+        return PasswordResetConfirmViewWrapper.as_view()(request, uidb64=uidb64, token=token, extra_context=platform_name)
 
     if UserRetirementRequest.has_user_requested_retirement(user):
         # Refuse to reset the password of any user that has requested retirement.
@@ -383,11 +406,11 @@ def password_reset_confirm_wrapper(request, uidb36=None, token=None):
             )
 
         if 'is_account_recovery' in request.GET:
-            return (PasswordResetConfirmView.as_view()
-                    (request, uidb64=uidb64, token=token, template_name='registration/password_reset_confirm.html',
-                     extra_context=platform_name))
+            return PasswordResetConfirmViewWrapper.as_view()(request, uidb64=uidb64, token=token, extra_context=platform_name)
         else:
-            response = PasswordResetConfirmView.as_view()(request, uidb64=uidb64, token=token, extra_context=platform_name)
+            import pdb;pdb.set_trace()
+            response = PasswordResetConfirmViewWrapper.as_view()(request, uidb64=uidb64, token=token,
+                                                                 extra_context=platform_name)
         # If password reset was unsuccessful a template response is returned (status_code 200).
         # Check if form is invalid then show an error to the user.
         # Note if password reset was successful we get response redirect (status_code 302).
@@ -444,7 +467,7 @@ def password_reset_confirm_wrapper(request, uidb36=None, token=None):
                 extra_tags='account-recovery aa-icon submission-success'
             )
     else:
-        response = PasswordResetConfirmView.as_view()(request, uidb64=uidb64, token=token, extra_context=platform_name)
+        response = PasswordResetConfirmViewWrapper.as_view()(request, uidb64=uidb64, token=token, extra_context=platform_name)
         response_was_successful = response.context.get('validlink')
         if response_was_successful and not user.is_active:
             user.is_active = True
@@ -522,7 +545,7 @@ def password_change_request_handler(request):
         except errors.UserNotFound:
             AUDIT_LOG.info("Invalid password reset attempt")
             # If enabled, send an email saying that a password reset was attempted, but that there is
-            # no user associated with the email
+            # no user associated with the emailsaa
             if configuration_helpers.get_value('ENABLE_PASSWORD_RESET_FAILURE_EMAIL',
                                                settings.FEATURES['ENABLE_PASSWORD_RESET_FAILURE_EMAIL']):
                 site = get_current_site()
