@@ -5,28 +5,17 @@ Tests for instructor_task/models.py.
 
 import copy
 import time
-
-from django.conf import settings
-from django.test import SimpleTestCase, TestCase, override_settings
-from mock import patch
-from opaque_keys.edx.locator import CourseLocator
 from six import StringIO
 
+import boto
+from django.conf import settings
+from django.test import SimpleTestCase, TestCase, override_settings
+from mock import patch, Mock
+from opaque_keys.edx.locator import CourseLocator
+
 from common.test.utils import MockS3BotoMixin
-from lms.djangoapps.instructor_task.models import TASK_INPUT_LENGTH, InstructorTask, ReportStore
+from lms.djangoapps.instructor_task.models import InstructorTask, ReportStore, TASK_INPUT_LENGTH
 from lms.djangoapps.instructor_task.tests.test_base import TestReportMixin
-
-
-class MockReportStore(object):
-    """ Mocking the report store """
-    def __init__(self):
-        self._links = []
-
-    def links_for(self, course_id):  # pylint: disable=unused-argument
-        return self._links[::-1]  # reverse the order
-
-    def store(self, course_id, filename, buff):  # pylint: disable=unused-argument
-        self._links.append((filename, '/static/uploads/'))
 
 
 class TestInstructorTasksModel(TestCase):
@@ -52,6 +41,7 @@ class ReportStoreTestMixin(object):
     """
     Mixin for report store tests.
     """
+
     def setUp(self):
         super(ReportStoreTestMixin, self).setUp()
         self.course_id = CourseLocator(org="testx", course="coursex", run="runx")
@@ -99,17 +89,23 @@ class LocalFSReportStoreTestCase(ReportStoreTestMixin, TestReportMixin, SimpleTe
     # Strip the leading `/`, because boto doesn't want it
     'ROOT_PATH': settings.GRADES_DOWNLOAD['ROOT_PATH'].lstrip('/')
 })
-class S3ReportStoreTestCase(MockS3BotoMixin, ReportStoreTestMixin, TestReportMixin, SimpleTestCase):
+class S3ReportStoreTestCase(ReportStoreTestMixin, TestReportMixin, SimpleTestCase):
     """
     Test the old S3ReportStore configuration.
     """
-    def create_report_store(self):
+    @override_settings(AWS_ACCESS_KEY_ID='test_key_id', AWS_SECRET_ACCESS_KEY='test_secret')
+    @patch('boto.s3.key.Key')
+    @patch('boto.s3.connection.S3Connection')
+    def create_report_store(self, mock_conn, mock_key):
         """
         Create and return a DjangoStorageReportStore using the old
         S3ReportStore configuration.
         """
-        with patch.object(ReportStore, 'from_config', return_value=MockReportStore()):
-            self.mocked_connection.create_bucket(settings.GRADES_DOWNLOAD['BUCKET'])
+        bucket = Mock(name=settings.GRADES_DOWNLOAD['BUCKET'])
+        bucket.list.return_value = []
+        mock_conn.return_value = Mock(get_bucket=Mock(return_value=bucket))
+
+        with patch('storages.backends.s3boto.S3BotoStorage.save') as ls:
             return ReportStore.from_config(config_name='GRADES_DOWNLOAD')
 
 
