@@ -327,8 +327,6 @@ def password_reset_confirm_wrapper(request, uidb36=None, token=None):
     We also optionally do some additional password policy checks.
     """
 
-    import pdb;
-    pdb.set_trace()
     # convert old-style base36-encoded user id to base64
     uidb64 = _uidb36_to_uidb64(uidb36)
     platform_name = {
@@ -408,7 +406,6 @@ def password_reset_confirm_wrapper(request, uidb36=None, token=None):
         if 'is_account_recovery' in request.GET:
             return PasswordResetConfirmViewWrapper.as_view()(request, uidb64=uidb64, token=token, extra_context=platform_name)
         else:
-            import pdb;pdb.set_trace()
             response = PasswordResetConfirmViewWrapper.as_view()(request, uidb64=uidb64, token=token,
                                                                  extra_context=platform_name)
         # If password reset was unsuccessful a template response is returned (status_code 200).
