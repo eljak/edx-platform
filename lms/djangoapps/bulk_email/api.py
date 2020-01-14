@@ -18,7 +18,7 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.urls import reverse
 
-from lms.djangoapps.discussion.notification_prefs.views import UsernameCipher, UsernameDecryptionException
+from lms.djangoapps.discussion.notification_prefs.views import UsernameCipher
 
 User = get_user_model()
 log = logging.getLogger(__name__)
@@ -41,15 +41,14 @@ def get_emails_enabled(user, course_id):
     return None
 
 
-def get_unsubscribed_link(email, course_id):
+def get_unsubscribed_link(username, course_id):
     """
 
-    :param email: user email
+    :param username: username
     :param course_id:
-    :return: AES encrypted token based on the email and course_id
+    :return: AES encrypted token based on the user email
     """
-    text_to_encrypt = u'{email} {course_id}'.format(email=email, course_id=course_id)
-    token = UsernameCipher.encrypt(text_to_encrypt)
-    optout_url = reverse('bulk_email_opt_out', kwargs={'token': token})
-    url = '{base_url}/{optout_url}'.format(base_url=settings.LMS_ROOT_URL, optout_url=optout_url)
+    token = UsernameCipher.encrypt(username)
+    optout_url = reverse('bulk_email_opt_out', kwargs={'token': token, 'course_id': course_id})
+    url = '{base_url}{optout_url}'.format(base_url=settings.LMS_ROOT_URL, optout_url=optout_url)
     return url

@@ -25,7 +25,7 @@ from opaque_keys.edx.keys import CourseKey
 log = logging.getLogger(__name__)
 
 
-def opt_out_email_updates(request, token):
+def opt_out_email_updates(request, token, course_id):
     """
     A view that let users opt out of any email updates.
 
@@ -36,8 +36,8 @@ def opt_out_email_updates(request, token):
     """
 
     try:
-        email, course_id = UsernameCipher().decrypt(token).decode().split(' ')
-        user = User.objects.get(email=email)
+        username = UsernameCipher().decrypt(token)
+        user = User.objects.get(username=username)
         course_key = CourseKey.from_string(course_id)
         course = get_course_by_id(course_key, depth=0)
     except UnicodeDecodeError:
@@ -45,7 +45,7 @@ def opt_out_email_updates(request, token):
     except UsernameDecryptionException as exn:
         raise Http404(text_type(exn))
     except User.DoesNotExist:
-        raise Http404("email")
+        raise Http404("username")
     except InvalidKeyError:
         raise Http404("courseId")
 

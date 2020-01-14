@@ -31,7 +31,8 @@
   padding: ($baseline*3) 15px ($baseline*6);
 
   h1 {
-    text-align: left;
+    @include text-align(left);
+
     font-size: 30px;
   }
 

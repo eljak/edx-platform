@@ -113,12 +113,13 @@ class TestOptoutCourseEmails(ModuleStoreTestCase):
         assert u'bulk_email/email/optout/' in plain_template
         assert u'bulk_email/email/optout/' in html_template
 
-        unsubscribe_link = re.findall(r"""/bulk_email.*?=[^']""", mail.outbox[0].alternatives[0][0])[0].strip()
-        response = self.client.get(unsubscribe_link + '/')
+        unsubscribe_link = re.findall(r"""/bulk_email/email.*(?='>)""", mail.outbox[0].alternatives[0][0])[0].strip()
+
+        response = self.client.get(unsubscribe_link)
 
         self.assertContains(response, 'unsubscribe')
 
-        response = self.client.post(unsubscribe_link + '/', {'unsubscribe': True})
+        response = self.client.post(unsubscribe_link, {'unsubscribe': True})
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'You have successfully unsubscribed from')

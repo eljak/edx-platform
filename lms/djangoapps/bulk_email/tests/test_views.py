@@ -31,9 +31,9 @@ class OptOutEmailUpdatesViewTest(ModuleStoreTestCase):
         super(OptOutEmailUpdatesViewTest, self).setUp()
         self.user = UserFactory.create(username="testuser1", email='test@example.com')
         self.course = CourseFactory.create(run='testcourse1', display_name='Test Course Title')
-        self.token = UsernameCipher.encrypt('test@example.com ' + text_type(self.course.id))
+        self.token = UsernameCipher.encrypt('testuser1')
         self.request_factory = RequestFactory()
-        self.url = reverse('bulk_email_opt_out', args=[self.token])
+        self.url = reverse('bulk_email_opt_out', args=[self.token, text_type(self.course.id)])
 
         # Ensure we start with no opt-out records
         self.assertEqual(Optout.objects.count(), 0)
@@ -63,21 +63,21 @@ class OptOutEmailUpdatesViewTest(ModuleStoreTestCase):
         self.assertEqual(Optout.objects.count(), 0)
 
     @ddt.data(
-        ("ZOMG INVALID BASE64 CHARS!!!", "base64url"),
-        ("Non-ASCII\xff".encode(), "base64url"),
-        ("D6L8Q01ztywqnr3coMOlq0C3DG05686lXX_1ArEd0ok", "base64url"),
-        ("AAAAAAAAAAA=", "initialization_vector"),
-        ("nMXVK7PdSlKPOovci-M7iqS09Ux8VoCNDJixLBmj", "aes"),
-        ("AAAAAAAAAAAAAAAAAAAAAMoazRI7ePLjEWXN1N7keLw=", "padding"),
-        (UsernameCipher.encrypt(u'testuser@example.com course-v1:testcourse1'), "email"),
-        (UsernameCipher.encrypt(u'test@example.com course-v1:testcourse'), "course"),
+        ("ZOMG INVALID BASE64 CHARS!!!", "base64url", False),
+        ("Non-ASCII\xff".encode(), "base64url", False),
+        ("D6L8Q01ztywqnr3coMOlq0C3DG05686lXX_1ArEd0ok", "base64url", False),
+        ("AAAAAAAAAAA=", "initialization_vector", False),
+        ("nMXVK7PdSlKPOovci-M7iqS09Ux8VoCNDJixLBmj", "aes", False),
+        ("AAAAAAAAAAAAAAAAAAAAAMoazRI7ePLjEWXN1N7keLw=", "padding", False),
+        ("AAAAAAAAAAAAAAAAAAAAACpyUxTGIrUjnpuUsNi7mAY=", "username", False),
+        ("_KHGdCAUIToc4iaRGy7K57mNZiiXxO61qfKT08ExlY8=", "course", 'course-v1:testcourse'),
     )
     @ddt.unpack
-    def test_unsubscribe_invalid_token(self, token, message):
+    def test_unsubscribe_invalid_token(self, token, message, course):
         """
         Make sure that view returns 404 in case token is not valid
         """
         request = self.request_factory.get("dummy")
         with self.assertRaises(Http404) as err:
-            opt_out_email_updates(request, token)
+            opt_out_email_updates(request, token, course)
             self.assertIn(message, err)
